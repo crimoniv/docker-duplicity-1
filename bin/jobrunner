@@ -12,7 +12,7 @@ from datetime import datetime
 from os import environ, path
 from socket import gethostname
 from string import Template
-from subprocess import CalledProcessError, check_output, STDOUT
+from subprocess import PIPE, Popen, STDOUT
 
 
 logging.basicConfig(level=logging.INFO)
@@ -51,13 +51,25 @@ for njob, command in sorted(to_run.items()):
     expanded_command = Template(command).safe_substitute(environ)
     start = datetime.now()
     logging.info("Running job %d: `%s`", njob, expanded_command)
+    result = ""
     try:
-        result = check_output(expanded_command, stderr=STDOUT, shell=True)
-        success = True
-    except CalledProcessError as error:
+        process = Popen(
+            expanded_command, stdout=PIPE, stderr=STDOUT, shell=True,
+            executable=environ.get("SHELL"), bufsize=1)
+        for line in iter(lambda: process.stdout.read(1), ""):
+            sys.stdout.write(line)
+            result += line
+        sys.stdout.write("\n")
+        process.communicate()
+        if process.returncode == 0:
+            success = True
+        else:
+            failed = True
+            success = False
+    except Exception as error:
         failed = True
         success = False
-        result = str(error) + "\n" + error.output
+        result += "\n" + str(error)
         logging.exception("Failed!")
     end = datetime.now()
     log = [
@@ -67,11 +79,9 @@ for njob, command in sorted(to_run.items()):
         "Started: {!s}".format(start),
         "Finished: {!s}".format(end),
         "Success: {!s}".format(success),
-        "",
-        result,
     ]
     logging.log(logging.INFO if success else logging.ERROR, "\n".join(log))
-    message += log
+    message += log + ["", result]
 
 
 # Report results
