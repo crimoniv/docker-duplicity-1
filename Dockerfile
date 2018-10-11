@@ -45,6 +45,7 @@ RUN apk add --no-cache \
         openssh \
         openssl \
         py2-gobject3 \
+        py2-pip \
         python
 
 # Default backup source directory
@@ -58,13 +59,12 @@ RUN apk add --no-cache --virtual .build \
         librsync-dev \
         linux-headers \
         openssl-dev \
-        py2-pip \
         python-dev \
     && pip install --no-cache-dir \
         azure-storage \
         b2 \
         boto \
-        dropbox \
+        dropbox==6.9.0 \
         gdata \
         lockfile \
         mediafire \
