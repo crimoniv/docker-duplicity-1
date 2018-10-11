@@ -1,4 +1,4 @@
-FROM alpine
+FROM alpine AS base
 
 ARG DUPLICITY_VERSION=0.7.17
 
@@ -91,3 +91,32 @@ LABEL org.label-schema.schema-version="1.0" \
       org.label-schema.build-date="$BUILD_DATE" \
       org.label-schema.vcs-ref="$VCS_REF" \
       org.label-schema.vcs-url="https://github.com/Tecnativa/docker-duplicity"
+
+
+FROM base AS base-s3
+ENV JOB_500_WHAT='dup full $SRC $DST' \
+    JOB_500_WHEN='weekly' \
+    OPTIONS_EXTRA='--full-if-older-than 1W --file-prefix-archive archive-$(hostname)- --file-prefix-manifest manifest-$(hostname)- --file-prefix-signature signature-$(hostname)- --s3-european-buckets --s3-multipart-chunk-size 10 --s3-use-new-style'
+
+
+FROM base AS docker
+RUN apk add --no-cache docker
+
+
+FROM docker AS docker-s3
+ENV JOB_500_WHAT='dup full $SRC $DST' \
+    JOB_500_WHEN='weekly' \
+    OPTIONS_EXTRA='--full-if-older-than 1W --file-prefix-archive archive-$(hostname)- --file-prefix-manifest manifest-$(hostname)- --file-prefix-signature signature-$(hostname)- --s3-european-buckets --s3-multipart-chunk-size 10 --s3-use-new-style'
+
+
+FROM base AS postgres
+RUN apk add --no-cache postgresql
+ENV JOB_200_WHAT='pg_dump --no-owner --no-privileges --file "$SRC/$PGDATABASE.sql"' \
+    JOB_200_WHEN='daily weekly' \
+    PGHOST=db
+
+
+FROM postgres AS postgres-s3
+ENV JOB_500_WHAT='dup full $SRC $DST' \
+    JOB_500_WHEN='weekly' \
+    OPTIONS_EXTRA='--full-if-older-than 1W --file-prefix-archive archive-$(hostname)- --file-prefix-manifest manifest-$(hostname)- --file-prefix-signature signature-$(hostname)- --s3-european-buckets --s3-multipart-chunk-size 10 --s3-use-new-style'
